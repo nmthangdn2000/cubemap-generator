@@ -1,0 +1,18 @@
+{
+  "name": "cut-cubemap",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "nodemon"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "typescript": "^5.4.4"
+  },
+  "dependencies": {
+    "panorama-to-cubemap": "^1.0.2"
+  }
+}
