@@ -1,94 +1,29 @@
-import { exec } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
-import { convertImage, OptionsType } from './panorama-to-cubemap';
+#!/usr/bin/env node
 
-const renderFile = async (file: Buffer, options: OptionsType, folderName: string) => {
-  const result = await convertImage(file, options);
+import { Command } from 'commander';
+import handle from './handle';
 
-  if (typeof result === 'string') {
-    console.log(result);
-    return;
-  }
+export const program = new Command();
 
-  result.forEach(({ buffer, filename }: { buffer: Buffer; filename: string }) => {
-    const outputPath = `${process.cwd()}/input/${folderName}/tile`;
+program.name('cube-map-panorama').description('Command-line interface for cube map panorama manipulation in JavaScript').version('0.0.1');
 
-    if (!existsSync(outputPath)) {
-      mkdirSync(outputPath);
-    }
+program
+  .description('CLi generates schema, controller, and service files according to the name you enter')
+  .argument('<input_panorama_folder>', 'Specify the path to the input panorama image folder.')
+  .argument('<output_panorama_folder>', 'Specify the path to the output folder where the cube map images will be saved.')
+  .option(
+    '-s, --size <size>',
+    'Specify the size (width and height) of each face of the cube map. Must be divisible by 2, 4, 8, or 16. Example: --size 375 (e.g., if each cube map face is 1500, then the size when divided by 4 is 375)'
+  )
+  .option(
+    '-q, --quality <quality>',
+    'Specify the quality of the image as a number from 0 to 100. Higher values indicate better quality. Default is 90. Example: --quality 80'
+  )
+  .option(
+    '-p, --panorama <panoramaName>',
+    'Specify the name of the panorama file. Example: --panorama panorama.jpg. If the panorama image name is in the format [name].[type], the low quality image name will be "[name]_low.[type]". The low quality image name must follow this format.',
+    'panorama.jpg'
+  )
+  .action((input: string, output: string, option: any, ...args: any[]) => handle.main(input, output, option));
 
-    const inputImage = `${outputPath}/${filename}`;
-
-    writeFileSync(inputImage, buffer);
-
-    exec(
-      ` cd ${process.cwd()}/input/${folderName}/tile && magick.exe ${filename} -crop 344x344 -quality 70 -set filename:tile "%[fx:page.x/344]_%[fx:page.y/344]" -set filename:orig %t %[filename:orig]_%[filename:tile].jpg`,
-      (err, stdout, stderr) => {
-        if (err) {
-          console.error(err);
-          return;
-        }
-
-        console.log(stdout);
-
-        console.log('end crop', filename);
-      }
-    );
-  });
-};
-
-const renderFileLow = async (fileLow: Buffer, options: OptionsType, folderName: string) => {
-  const resultLow = await convertImage(fileLow, options);
-
-  if (typeof resultLow === 'string') {
-    console.log(resultLow);
-    return;
-  }
-
-  resultLow.forEach(({ buffer, filename }: { buffer: Buffer; filename: string }) => {
-    const outputPath = `${process.cwd()}/input/${folderName}/tile_low`;
-
-    if (!existsSync(outputPath)) {
-      mkdirSync(outputPath);
-    }
-    const inputImage = `${outputPath}/${filename}`;
-    writeFileSync(inputImage, buffer);
-  });
-};
-
-const readNameFolder = async () => {
-  const folderNames = readdirSync('input');
-
-  // folderNames.forEach(async (folderName, index) => {
-  for (let i = 0; i < folderNames.length; i++) {
-    const folderName = folderNames[i];
-
-    if (i !== 0) continue;
-
-    const file = readFileSync(`input/${folderName}/panorama.jpg`);
-    const fileLow = readFileSync(`input/${folderName}/panorama_low.jpg`);
-
-    const options: OptionsType = {
-      rotation: 180,
-      interpolation: 'lanczos',
-      outformat: 'jpg',
-      outtype: 'buffer',
-      width: Infinity,
-    };
-
-    try {
-      console.log('start convert panorama:', folderName);
-
-      await renderFile(file, options, folderName);
-      await renderFileLow(fileLow, options, folderName);
-    } catch (error) {
-      console.error(error);
-    }
-  }
-};
-
-const main = async () => {
-  readNameFolder();
-};
-
-main();
+program.parse();
