@@ -1,5 +1,5 @@
 import { exec } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { convertImage, OptionsType } from './panorama-to-cubemap';
 import { program } from 'commander';
 import * as chalk from 'chalk';
@@ -7,10 +7,14 @@ import { createSpinner } from 'nanospinner';
 import * as figlet from 'figlet';
 import * as gradient from 'gradient-string';
 
-type OptionCLI = {
+export type OptionCLI = {
   size: number;
   quality?: number;
   panorama?: string;
+  input?: string;
+  inputQuality?: string;
+  inputLow?: string;
+  output: string;
 };
 
 function ValidateParams() {
@@ -20,20 +24,29 @@ function ValidateParams() {
     // Define a wrapper function
     descriptor.value = function (...args: any[]): void {
       try {
-        // Extract input, output, and option from the arguments
-        let [input, output, option] = args;
+        // Extract  and option from the arguments
+        let [option] = args;
+        console.log('option', option);
 
         // Add your validation logic here
-        if (!input || !output || !option || !option.size) {
+        if (!option || !option.size) {
           throw new Error('Invalid parameters');
         }
 
-        if (input[input.length - 1] === '/') {
-          input = input.substring(0, input.length - 1);
+        if (!option.input && (!option.inputQuality || !option.inputLow)) {
+          throw new Error('One of the input or inputQuality and inputLow parameters must be provided');
         }
 
-        if (output[output.length - 1] === '/') {
-          output = output.substring(0, output.length - 1);
+        if (!option.output) {
+          throw new Error('The output parameter must be provided');
+        }
+
+        if (option.input && option.input[option.input.length - 1] === '/') {
+          option.input = option.input.substring(0, option.input.length - 1);
+        }
+
+        if (option.output && option.output[option.output.length - 1] === '/') {
+          option.output = option.output.substring(0, option.output.length - 1);
         }
 
         // Parse size to ensure it's a valid number
@@ -54,7 +67,7 @@ function ValidateParams() {
           throw new Error('Invalid panorama parameter');
         }
         // Call the original method
-        return originalMethod.apply(this, [input, output, option, ...args.slice(3)]);
+        return originalMethod.apply(this, [option, ...args.slice(3)]);
       } catch (error) {
         program.error(error.message);
       }
@@ -68,12 +81,14 @@ class Handle {
   constructor() {}
 
   @ValidateParams()
-  async main(input: string, output: string, option: OptionCLI) {
+  async main(option: OptionCLI) {
     try {
       console.clear();
       console.log('\n');
 
-      const inputPanoramas = this.readNameFolder(input, option.panorama);
+      const inputPanoramas = option.input
+        ? this.readNameFolder(option.input, option.panorama)
+        : this.readFileName(option.inputQuality, option.inputLow);
       const options: OptionsType = {
         rotation: 180,
         interpolation: 'lanczos',
@@ -93,8 +108,8 @@ class Handle {
 
       for (let i = 0; i < inputPanoramas.length; i++) {
         const element = inputPanoramas[i];
-        await this.renderFile(output, element.folderName, element.file, options, { quality: 90, ...option });
-        await this.renderFileLow(output, element.folderName, element.fileLow, options);
+        await this.renderFile(option.output, element.folderName, element.file, options, { quality: 90, ...option });
+        await this.renderFileLow(option.output, element.folderName, element.fileLow, options);
       }
     } catch (error) {
       console.error(`${chalk.redBright('ERROR:')} ${error.message}`);
@@ -193,6 +208,24 @@ class Handle {
         fileLow: readFileSync(`${pathInputFolder}/${folderName}/${filename}_low.${typeFile}`),
         folderName,
       };
+    });
+  }
+
+  readFileName(inputQuality: string, inputLow: string) {
+    const folderQualityNames = readdirSync(inputQuality).filter((f) => {
+      const stats = statSync(`${inputQuality}/${f}`);
+      return stats.isFile();
+    });
+    const folderLowNames = readdirSync(inputLow).filter((f) => {
+      const stats = statSync(`${inputLow}/${f}`);
+      return stats.isFile();
+    });
+
+    return folderQualityNames.map((folderName) => {
+      const file = readFileSync(`${inputQuality}/${folderName}`);
+      const fileLow = readFileSync(`${inputLow}/${folderLowNames.find((ln) => new RegExp(folderName.split('.')[0]).test(ln))}`);
+
+      return { folderName: folderName.split('.')[0], file, fileLow };
     });
   }
 }
