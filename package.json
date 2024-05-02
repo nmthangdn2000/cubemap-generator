@@ -9,7 +9,7 @@
     "test": "ts-node ./src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc -p .",
-    "postbuild": "pkg ."
+    "postbuild": "tsc -p . && pkg ."
   },
   "pkg": {
     "scripts": "dist/*.js", 
