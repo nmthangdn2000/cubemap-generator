@@ -5,7 +5,7 @@ import handle from './handle';
 
 export const program = new Command();
 
-program.name('cube-map-panorama').description('Command-line interface for cube map panorama manipulation in JavaScript').version('0.0.1');
+program.name('cube-map-panorama').description('Command-line interface for cube map panorama manipulation in JavaScript').version('0.0.2');
 
 program
   .description('CLi generates schema, controller, and service files according to the name you enter')
