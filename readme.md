@@ -81,6 +81,8 @@ $ cubemap-generator [options]
 
 Options:
 
+- ``-ig, --input-generate <inputGenerate>`: Generate data panoramas.
+- `'-g, --generate`: If you use this flag when the --input-generate flag is present, it will both cut panorama and generate, otherwise it will only generate panorama data.
 - `-i, --input <input>`: Specify the path to the input panorama image folder. Example: --input /path/to/input/folder.
 - `-iq, --input-quality <inputQuality>`: Specify the path to the low-quality input panorama image quality folder. Example: --input-quality /path/to/input_quality/folder.
 - `-il, --input-low <inputLow>`: Specify the path to the low-quality input panorama image folder. Example: --input-low /path/to/input_low/folder.
