@@ -15,6 +15,8 @@ export type OptionCLI = {
   inputQuality?: string;
   inputLow?: string;
   output: string;
+  inputGenerate?: string;
+  generate?: boolean;
 };
 
 function ValidateParams() {
@@ -33,7 +35,7 @@ function ValidateParams() {
           throw new Error('Invalid parameters');
         }
 
-        if (!option.input && (!option.inputQuality || !option.inputLow)) {
+        if (!option.input && (!option.inputQuality || !option.inputLow) && !option.inputGenerate) {
           throw new Error('One of the input or inputQuality and inputLow parameters must be provided');
         }
 
@@ -47,6 +49,10 @@ function ValidateParams() {
 
         if (option.output && option.output[option.output.length - 1] === '/') {
           option.output = option.output.substring(0, option.output.length - 1);
+        }
+
+        if (option.inputGenerate && option.inputGenerate[option.inputGenerate.length - 1] === '/') {
+          option.inputGenerate = option.inputGenerate.substring(0, option.inputGenerate.length - 1);
         }
 
         // Parse size to ensure it's a valid number
@@ -86,30 +92,44 @@ class Handle {
       console.clear();
       console.log('\n');
 
-      const inputPanoramas = option.input
-        ? this.readNameFolder(option.input, option.panorama)
-        : this.readFileName(option.inputQuality, option.inputLow);
-      const options: OptionsType = {
-        rotation: 180,
-        interpolation: 'lanczos',
-        outformat: 'jpg',
-        outtype: 'buffer',
-        width: Infinity,
-      };
+      if (option.inputGenerate && !option.generate) {
+        this.generateDataPanoramas(option.inputGenerate, option.output);
 
-      const text = figlet.textSync('CUBEMAP GENERATOR');
-      console.log(gradient.pastel.multiline(text));
-      console.log('\n');
-      // console.log('Donate for me:');
-      // console.log(`Bank account: ${chalk.blueBright('9327124224')}`);
-      // console.log(`Account holder: ${chalk.blueBright('NGUYEN MINH THANG')}`);
-      // console.log(`Bank branch: ${chalk.blueBright('VCB - Vietcombank')}`);
-      // console.log('\n');
+        console.log('\n');
+        console.log(gradient.pastel.multiline('Thank you for using the cut panorama tool!'));
+        return;
+      }
 
-      for (let i = 0; i < inputPanoramas.length; i++) {
-        const element = inputPanoramas[i];
-        await this.renderFile(option.output, element.folderName, element.file, options, { quality: 90, ...option });
-        await this.renderFileLow(option.output, element.folderName, element.fileLow, options);
+      if (option.input || (option.inputQuality && option.inputLow)) {
+        const inputPanoramas = option.input
+          ? this.readNameFolder(option.input, option.panorama)
+          : this.readFileName(option.inputQuality, option.inputLow);
+        const options: OptionsType = {
+          rotation: 180,
+          interpolation: 'lanczos',
+          outformat: 'jpg',
+          outtype: 'buffer',
+          width: Infinity,
+        };
+
+        const text = figlet.textSync('CUBEMAP GENERATOR');
+        console.log(gradient.pastel.multiline(text));
+        console.log('\n');
+        // console.log('Donate for me:');
+        // console.log(`Bank account: ${chalk.blueBright('9327124224')}`);
+        // console.log(`Account holder: ${chalk.blueBright('NGUYEN MINH THANG')}`);
+        // console.log(`Bank branch: ${chalk.blueBright('VCB - Vietcombank')}`);
+        // console.log('\n');
+
+        for (let i = 0; i < inputPanoramas.length; i++) {
+          const element = inputPanoramas[i];
+          await this.renderFile(option.output, element.folderName, element.file, options, { quality: 90, ...option });
+          await this.renderFileLow(option.output, element.folderName, element.fileLow, options);
+        }
+      }
+
+      if (option.inputGenerate) {
+        this.generateDataPanoramas(option.inputGenerate, option.output);
       }
     } catch (error) {
       console.error(`${chalk.redBright('ERROR:')} ${error.message}`);
@@ -209,6 +229,26 @@ class Handle {
         folderName,
       };
     });
+  }
+
+  private generateDataPanoramas(pathInputFolder: string, pathOutputFolder: string) {
+    const folderNames = readdirSync(pathInputFolder).filter((f) => {
+      const stats = statSync(`${pathInputFolder}/${f}`);
+      return !stats.isFile();
+    });
+
+    const data = folderNames.map((fileName, index) => ({
+      id: index,
+      title: fileName.split('.')[0],
+      cameraPosition: { yaw: 6.230238484163068, pitch: 0.010195190955851308 },
+      subtitle: fileName.split('.')[0],
+      description: `This is the ${fileName.split('.')[0]} panorama`,
+      image: `${fileName}.jpg`,
+      thumbnail: `${fileName}.jpg`,
+      markers: [],
+    }));
+
+    return writeFileSync(`${pathOutputFolder}/data.json`, JSON.stringify(data, null, 2));
   }
 
   readFileName(inputQuality: string, inputLow: string) {

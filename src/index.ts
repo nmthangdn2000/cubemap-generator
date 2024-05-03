@@ -9,6 +9,11 @@ program.name('cube-map-panorama').description('Command-line interface for cube m
 
 program
   .description('CLi generates schema, controller, and service files according to the name you enter')
+  .option('-ig, --input-generate <inputGenerate>', 'Generate data panoramas')
+  .option(
+    '-g, --generate',
+    'If you use this flag when the --input-generate flag is present, it will both cut panorama and generate, otherwise it will only generate panorama data.'
+  )
   .option('-i, --input <input>', 'Specify the path to the input panorama image folder. Example: --input /path/to/input/folder')
   .option(
     '-iq, --input-quality <inputQuality>',
