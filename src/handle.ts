@@ -163,10 +163,18 @@ class Handle {
           });
         }
 
+        if (!existsSync(outputPathCube)) {
+          mkdirSync(outputPathCube, {
+            recursive: true,
+          });
+        }
+
         const inputImage = `${outputPath}/${filename}`;
 
-        writeFileSync(`${outputPathCube}/${filename}`, buffer);
-        writeFileSync(inputImage, buffer);
+        const bufferCopy = Buffer.from(buffer);
+
+        writeFileSync(`${outputPathCube}/${filename}`, bufferCopy);
+        writeFileSync(inputImage, bufferCopy);
 
         await new Promise((resolve, reject) => {
           const child = exec(
