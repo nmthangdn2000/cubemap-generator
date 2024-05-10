@@ -154,6 +154,7 @@ class Handle {
       const spinnerCube = createSpinner(`${chalk.yellowBright('STARTING CUT CUBE MAP:')} ${folderName}/${filename}`).start();
 
       try {
+        const outputPathCube = `${pathOutputFolder}/${folderName}/cube`;
         const outputPath = `${pathOutputFolder}/${folderName}/tile`;
 
         if (!existsSync(outputPath)) {
@@ -164,6 +165,7 @@ class Handle {
 
         const inputImage = `${outputPath}/${filename}`;
 
+        writeFileSync(`${outputPathCube}/${filename}`, buffer);
         writeFileSync(inputImage, buffer);
 
         await new Promise((resolve, reject) => {
