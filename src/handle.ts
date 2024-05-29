@@ -1,11 +1,13 @@
+import chalk from 'chalk';
 import { exec } from 'child_process';
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
-import { convertImage, OptionsType } from './panorama-to-cubemap';
+import cluster from 'cluster';
 import { program } from 'commander';
-import * as chalk from 'chalk';
-import { createSpinner } from 'nanospinner';
 import * as figlet from 'figlet';
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import * as gradient from 'gradient-string';
+import { createSpinner } from 'nanospinner';
+import { cpus, platform } from 'os';
+import { OptionsType, PanoramaToCubeMap } from './panorama-to-cubemap';
 
 export type OptionCLI = {
   size: number;
@@ -19,6 +21,14 @@ export type OptionCLI = {
   generate?: boolean;
 };
 
+const options: OptionsType = {
+  rotation: 180,
+  interpolation: 'lanczos',
+  outformat: 'jpg',
+  outtype: 'buffer',
+  width: Infinity,
+};
+
 function ValidateParams() {
   return function (target: any, _propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
@@ -28,7 +38,6 @@ function ValidateParams() {
       try {
         // Extract  and option from the arguments
         let [option] = args;
-        console.log('option', option);
 
         // Add your validation logic here
         if (!option || !option.size) {
@@ -88,7 +97,14 @@ class Handle {
 
   @ValidateParams()
   async main(option: OptionCLI) {
-    try {
+    const inputPanoramas = option.input
+      ? this.readNameFolder(option.input, option.panorama)
+      : this.readFileName(option.inputQuality, option.inputLow);
+
+    if (cluster.isPrimary) {
+      const numCPUs = cpus().length; // Lấy số lượng CPU
+      const tasksPerCPU = Math.ceil(inputPanoramas.length / numCPUs); // Chia nhỏ task theo số CPU
+
       console.clear();
       console.log('\n');
 
@@ -101,17 +117,6 @@ class Handle {
       }
 
       if (option.input || (option.inputQuality && option.inputLow)) {
-        const inputPanoramas = option.input
-          ? this.readNameFolder(option.input, option.panorama)
-          : this.readFileName(option.inputQuality, option.inputLow);
-        const options: OptionsType = {
-          rotation: 180,
-          interpolation: 'lanczos',
-          outformat: 'jpg',
-          outtype: 'buffer',
-          width: Infinity,
-        };
-
         const text = figlet.textSync('CUBEMAP GENERATOR');
         console.log(gradient.pastel.multiline(text));
         console.log('\n');
@@ -121,27 +126,90 @@ class Handle {
         // console.log(`Bank branch: ${chalk.blueBright('VCB - Vietcombank')}`);
         // console.log('\n');
 
-        for (let i = 0; i < inputPanoramas.length; i++) {
-          const element = inputPanoramas[i];
-          await this.renderFile(option.output, element.folderName, element.file, options, { quality: 90, ...option });
-          await this.renderFileLow(option.output, element.folderName, element.fileLow, options);
+        // for (let i = 0; i < inputPanoramas.length; i++) {
+        //   const element = inputPanoramas[i];
+        //
+        // }
+
+        const tasksCompleted = [];
+
+        for (let i = 0; i < numCPUs; i++) {
+          const start = i * tasksPerCPU;
+          const end = Math.min(start + tasksPerCPU, inputPanoramas.length);
+
+          for (let j = start; j < end; j++) {
+            const worker = cluster.fork();
+            worker.send({
+              index: j,
+              options,
+              option,
+              inputPanoramas: inputPanoramas[j],
+            });
+
+            worker.on('message', (status) => {
+              tasksCompleted.push(status);
+              if (tasksCompleted.length === inputPanoramas.length) {
+                console.log('\n');
+                console.log(gradient.pastel.multiline('Thank you for using the cut panorama tool!'));
+
+                process.exit();
+              }
+              worker.kill();
+            });
+          }
         }
       }
 
       if (option.inputGenerate) {
         this.generateDataPanoramas(option.inputGenerate, option.output);
       }
-    } catch (error) {
-      console.error(`${chalk.redBright('ERROR:')} ${error.message}`);
-    }
+    } else {
+      process.on(
+        'message',
+        async ({
+          index,
+          options,
+          option,
+          inputPanoramas,
+        }: {
+          index: number;
+          options: OptionsType;
+          option: OptionCLI;
+          inputPanoramas: { folderName: string; file: string; fileLow: string };
+        }) => {
+          try {
+            await this.renderFile(index, option.output, inputPanoramas.folderName, inputPanoramas.file, options, {
+              quality: 90,
+              ...option,
+            });
+            await this.renderFileLow(option.output, inputPanoramas.folderName, inputPanoramas.fileLow, options);
 
-    console.log('\n');
-    console.log(gradient.pastel.multiline('Thank you for using the cut panorama tool!'));
+            process.send?.({
+              success: true,
+            });
+          } catch (error) {
+            console.error(error);
+
+            process.send?.({
+              success: false,
+            });
+          }
+        }
+      );
+    }
   }
 
-  private async renderFile(pathOutputFolder: string, folderName: string, file: Buffer, options: OptionsType, option: OptionCLI) {
-    const spinnerPanorama = createSpinner(`${chalk.yellowBright('PROCESSING PANORAMA TO CUBE MAP:')} ${folderName}`).start();
-    const result = await convertImage(file, options);
+  private async renderFile(
+    index: number,
+    pathOutputFolder: string,
+    folderName: string,
+    file: string,
+    options: OptionsType,
+    option: OptionCLI
+  ) {
+    const spinnerPanorama = createSpinner(`${chalk.yellowBright('PROCESSING PANORAMA TO CUBE MAP:')} ${folderName} \n`).start();
+    const panoramaToCubeMap = new PanoramaToCubeMap();
+    const result = await panoramaToCubeMap.convertImage(readFileSync(file), options);
     spinnerPanorama.success({ text: `${chalk.greenBright('PROCESSED SUCCESSFULLY PANORAMA TO CUBE MAP:')} ${folderName}` });
 
     if (typeof result === 'string') {
@@ -177,8 +245,11 @@ class Handle {
         writeFileSync(inputImage, bufferCopy);
 
         await new Promise((resolve, reject) => {
+          const plf = platform();
+          const packageName = plf === 'win32' ? 'imagemagick' : plf === 'darwin' ? 'convert' : 'imagemagick';
+
           const child = exec(
-            ` cd ${outputPath} && magick.exe ${filename} -crop ${option.size}x${option.size} -quality ${option.quality} -set filename:tile "%[fx:page.x/${option.size}]_%[fx:page.y/${option.size}]" -set filename:orig %t %[filename:orig]_%[filename:tile].jpg`
+            ` cd ${outputPath} && ${packageName} ${filename} -crop ${option.size}x${option.size} -quality ${option.quality} -set filename:tile "%[fx:page.x/${option.size}]_%[fx:page.y/${option.size}]" -set filename:orig %t %[filename:orig]_%[filename:tile].jpg`
           );
 
           child.on('error', (err) => {
@@ -202,9 +273,10 @@ class Handle {
     }
   }
 
-  private async renderFileLow(pathOutputFolder: string, folderName: string, file: Buffer, options: OptionsType) {
+  private async renderFileLow(pathOutputFolder: string, folderName: string, file: string, options: OptionsType) {
     const spinnerPanorama = createSpinner(`${chalk.yellowBright('PROCESSING PANORAMA LOW TO CUBE MAP:')} ${folderName}`).start();
-    const resultLow = await convertImage(file, options);
+    const panoramaToCubeMap = new PanoramaToCubeMap();
+    const resultLow = await panoramaToCubeMap.convertImage(readFileSync(file), options);
 
     if (typeof resultLow === 'string') {
       return;
@@ -234,8 +306,8 @@ class Handle {
 
     return folderNames.map((folderName) => {
       return {
-        file: readFileSync(`${pathInputFolder}/${folderName}/${panorama}`),
-        fileLow: readFileSync(`${pathInputFolder}/${folderName}/${filename}_low.${typeFile}`),
+        file: `${pathInputFolder}/${folderName}/${panorama}`,
+        fileLow: `${pathInputFolder}/${folderName}/${filename}_low.${typeFile}`,
         folderName,
       };
     });
@@ -272,8 +344,8 @@ class Handle {
     });
 
     return folderQualityNames.map((folderName) => {
-      const file = readFileSync(`${inputQuality}/${folderName}`);
-      const fileLow = readFileSync(`${inputLow}/${folderLowNames.find((ln) => new RegExp(folderName.split('.')[0]).test(ln))}`);
+      const file = `${inputQuality}/${folderName}`;
+      const fileLow = `${inputLow}/${folderLowNames.find((ln) => new RegExp(folderName.split('.')[0]).test(ln))}`;
 
       return { folderName: folderName.split('.')[0], file, fileLow };
     });

@@ -12,11 +12,18 @@
     "postbuild": "tsc -p . && pkg ."
   },
   "pkg": {
-    "scripts": "dist/*.js", 
-    "assets": ["node_modules/figlet/fonts/Standard.flf","node_modules/canvas/build/Release/*"],
-    "targets": ["node18-linux-x64", "node18-macos-x64", "node18-win-x64"],
-    "outputPath": "build", 
-    "icon": "public/logo.ico" 
+    "scripts": "dist/*.js",
+    "assets": [
+      "node_modules/figlet/fonts/Standard.flf",
+      "node_modules/canvas/build/Release/*"
+    ],
+    "targets": [
+      "node18-linux-x64",
+      "node18-macos-x64",
+      "node18-win-x64"
+    ],
+    "outputPath": "build",
+    "icon": "public/logo.ico"
   },
   "author": "",
   "license": "ISC",
