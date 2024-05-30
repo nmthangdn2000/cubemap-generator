@@ -6,7 +6,7 @@ import * as figlet from 'figlet';
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'fs';
 import * as gradient from 'gradient-string';
 import { createSpinner } from 'nanospinner';
-import { cpus, platform } from 'os';
+import { cpus } from 'os';
 import { OptionsType, PanoramaToCubeMap } from './panorama-to-cubemap';
 
 export type OptionCLI = {
@@ -245,11 +245,10 @@ class Handle {
         writeFileSync(inputImage, bufferCopy);
 
         await new Promise((resolve, reject) => {
-          const plf = platform();
-          const packageName = plf === 'win32' ? 'imagemagick' : plf === 'darwin' ? 'convert' : 'imagemagick';
+          const packageName = 'magick';
 
           const child = exec(
-            ` cd ${outputPath} && ${packageName} ${filename} -crop ${option.size}x${option.size} -quality ${option.quality} -set filename:tile "%[fx:page.x/${option.size}]_%[fx:page.y/${option.size}]" -set filename:orig %t %[filename:orig]_%[filename:tile].jpg`
+            ` cd "${outputPath}" && ${packageName} "${filename}" -crop ${option.size}x${option.size} -quality ${option.quality} -set filename:tile "%[fx:page.x/${option.size}]_%[fx:page.y/${option.size}]" -set filename:orig %t %[filename:orig]_%[filename:tile].jpg`
           );
 
           child.on('error', (err) => {
