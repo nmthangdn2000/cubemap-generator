@@ -140,7 +140,6 @@ class Handle {
           for (let j = start; j < end; j++) {
             const worker = cluster.fork();
             worker.send({
-              index: j,
               options,
               option,
               inputPanoramas: inputPanoramas[j],
@@ -167,18 +166,16 @@ class Handle {
       process.on(
         'message',
         async ({
-          index,
           options,
           option,
           inputPanoramas,
         }: {
-          index: number;
           options: OptionsType;
           option: OptionCLI;
           inputPanoramas: { folderName: string; file: string; fileLow: string };
         }) => {
           try {
-            await this.renderFile(index, option.output, inputPanoramas.folderName, inputPanoramas.file, options, {
+            await this.renderFile(option.output, inputPanoramas.folderName, inputPanoramas.file, options, {
               quality: 90,
               ...option,
             });
@@ -199,14 +196,7 @@ class Handle {
     }
   }
 
-  private async renderFile(
-    index: number,
-    pathOutputFolder: string,
-    folderName: string,
-    file: string,
-    options: OptionsType,
-    option: OptionCLI
-  ) {
+  private async renderFile(pathOutputFolder: string, folderName: string, file: string, options: OptionsType, option: OptionCLI) {
     const spinnerPanorama = createSpinner(`${chalk.yellowBright('PROCESSING PANORAMA TO CUBE MAP:')} ${folderName} \n`).start();
     const panoramaToCubeMap = new PanoramaToCubeMap();
     const result = await panoramaToCubeMap.convertImage(readFileSync(file), options);
@@ -337,10 +327,14 @@ class Handle {
       const stats = statSync(`${inputQuality}/${f}`);
       return stats.isFile();
     });
-    const folderLowNames = readdirSync(inputLow).filter((f) => {
-      const stats = statSync(`${inputLow}/${f}`);
-      return stats.isFile();
-    });
+    const folderLowNames = readdirSync(inputLow)
+      .filter((f) => {
+        const stats = statSync(`${inputLow}/${f}`);
+        return stats.isFile();
+      })
+      .sort((a, b) => {
+        return a.length - b.length;
+      });
 
     return folderQualityNames.map((folderName) => {
       const file = `${inputQuality}/${folderName}`;
