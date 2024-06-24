@@ -291,7 +291,7 @@ class Handle {
     const folderNames = readdirSync(pathInputFolder);
     const panoramaSplit = panorama.split('.');
     const typeFile = panoramaSplit.pop();
-    const filename = panoramaSplit;
+    const filename = panoramaSplit.join('.');
 
     return folderNames.map((folderName) => {
       return {
@@ -338,9 +338,13 @@ class Handle {
 
     return folderQualityNames.map((folderName) => {
       const file = `${inputQuality}/${folderName}`;
-      const fileLow = `${inputLow}/${folderLowNames.find((ln) => new RegExp(folderName.split('.')[0]).test(ln))}`;
 
-      return { folderName: folderName.split('.')[0], file, fileLow };
+      const lastDotIndex = folderName.lastIndexOf('.');
+      const filename = folderName.substring(0, lastDotIndex);
+
+      const fileLow = `${inputLow}/${folderLowNames.find((ln) => new RegExp(filename).test(ln))}`;
+
+      return { folderName: filename, file, fileLow };
     });
   }
 }
